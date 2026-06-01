@@ -78,7 +78,7 @@ export function StoreDialog({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="flex max-h-[85vh] w-[min(64rem,calc(100vw-2rem))] max-w-[min(64rem,calc(100vw-2rem))] flex-col overflow-hidden sm:max-w-[min(64rem,calc(100vw-2rem))]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Database className="h-4 w-4" />
@@ -104,9 +104,9 @@ export function StoreDialog({
             </Label>
           </div>
         </DialogHeader>
-        <div className="grid h-[60vh] grid-cols-[260px_1fr] gap-3">
-          <ScrollArea className="rounded-md border border-border">
-            <div className="flex flex-col gap-1 p-2">
+        <div className="grid min-h-0 flex-1 grid-cols-[260px_minmax(0,1fr)] gap-3">
+          <ScrollArea className="min-h-0 min-w-0 rounded-md border border-border">
+            <div className="flex min-w-0 flex-col gap-1 p-2">
               {namespaces.error && (
                 <p className="px-2 py-1 text-xs text-destructive">
                   Failed to list namespaces.
@@ -131,19 +131,21 @@ export function StoreDialog({
                     type="button"
                     onClick={() => setActiveNs(ns)}
                     className={cn(
-                      "flex items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-accent",
+                      "flex min-w-0 items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-accent",
                       isActive && "bg-accent"
                     )}
                   >
                     <FolderTree className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
-                    <span className="truncate font-mono">{key}</span>
+                    <span className="min-w-0 flex-1 truncate font-mono">
+                      {key}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </ScrollArea>
-          <ScrollArea className="rounded-md border border-border">
-            <div className="flex flex-col gap-2 p-3">
+          <ScrollArea className="min-h-0 min-w-0 rounded-md border border-border">
+            <div className="flex min-w-0 flex-col gap-2 p-3">
               {!activeNs && (
                 <p className="text-center text-sm text-muted-foreground">
                   Select a namespace on the left.
@@ -173,14 +175,14 @@ export function StoreDialog({
 
 function ItemRow({ item }: { item: Item }) {
   return (
-    <div className="rounded border border-border p-2">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="truncate font-mono text-xs">{item.key}</span>
+    <div className="min-w-0 rounded border border-border p-2">
+      <div className="mb-1 flex min-w-0 items-center justify-between gap-2">
+        <span className="min-w-0 truncate font-mono text-xs">{item.key}</span>
         <span className="flex-shrink-0 text-xs text-muted-foreground">
           {new Date(item.updatedAt).toLocaleString()}
         </span>
       </div>
-      <pre className="overflow-auto rounded bg-muted/50 p-2 font-mono text-[11px] leading-snug">
+      <pre className="w-full max-w-full overflow-auto whitespace-pre-wrap break-all rounded bg-muted/50 p-2 font-mono text-[11px] leading-snug">
         {JSON.stringify(item.value, null, 2)}
       </pre>
     </div>
