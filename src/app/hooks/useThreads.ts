@@ -3,6 +3,34 @@ import type { Thread } from "@langchain/langgraph-sdk";
 import { Client } from "@langchain/langgraph-sdk";
 import { getConfig } from "@/lib/config";
 
+function makeClient(deploymentUrl: string, apiKey?: string): Client {
+  return new Client({
+    apiUrl: deploymentUrl,
+    defaultHeaders: apiKey ? { "X-Api-Key": apiKey } : {},
+  });
+}
+
+/** Update a thread's title by writing to its metadata. */
+export async function renameThread(
+  deploymentUrl: string,
+  threadId: string,
+  title: string,
+  apiKey?: string
+): Promise<void> {
+  await makeClient(deploymentUrl, apiKey).threads.update(threadId, {
+    metadata: { title },
+  });
+}
+
+/** Permanently delete a thread. */
+export async function deleteThread(
+  deploymentUrl: string,
+  threadId: string,
+  apiKey?: string
+): Promise<void> {
+  await makeClient(deploymentUrl, apiKey).threads.delete(threadId);
+}
+
 export interface ThreadItem {
   id: string;
   updatedAt: Date;
@@ -86,7 +114,13 @@ export function useThreads(props: {
       });
 
       return threads.map((thread): ThreadItem => {
-        let title = "Untitled Thread";
+        // User-set title (via PATCH metadata.title) wins; otherwise derive
+        // from the first human message.
+        const explicitTitle =
+          typeof thread.metadata?.title === "string"
+            ? (thread.metadata.title as string)
+            : undefined;
+        let title = explicitTitle ?? "Untitled Thread";
         let description = "";
 
         try {
@@ -95,7 +129,7 @@ export function useThreads(props: {
             const firstHumanMessage = values.messages.find(
               (m: any) => m.type === "human"
             );
-            if (firstHumanMessage?.content) {
+            if (!explicitTitle && firstHumanMessage?.content) {
               const content =
                 typeof firstHumanMessage.content === "string"
                   ? firstHumanMessage.content
@@ -114,8 +148,9 @@ export function useThreads(props: {
             }
           }
         } catch {
-          // Fallback to thread ID
-          title = `Thread ${thread.thread_id.slice(0, 8)}`;
+          if (!explicitTitle) {
+            title = `Thread ${thread.thread_id.slice(0, 8)}`;
+          }
         }
 
         return {

@@ -2,9 +2,18 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { format } from "date-fns";
-import { Loader2, MessageSquare, X } from "lucide-react";
+import { Check, Loader2, MessageSquare, Pencil, Trash2, X } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -18,8 +27,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { getConfig } from "@/lib/config";
 import type { ThreadItem } from "@/app/hooks/useThreads";
-import { useThreads } from "@/app/hooks/useThreads";
+import {
+  deleteThread as deleteThreadApi,
+  renameThread as renameThreadApi,
+  useThreads,
+} from "@/app/hooks/useThreads";
 
 type StatusFilter = "all" | "idle" | "busy" | "interrupted" | "error";
 
@@ -123,13 +137,73 @@ export function ThreadList({
   onClose,
   onInterruptCountChange,
 }: ThreadListProps) {
-  const [currentThreadId] = useQueryState("threadId");
+  const [currentThreadId, setCurrentThreadId] = useQueryState("threadId");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  // Inline-rename state: which thread is in edit mode, and the draft text.
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  // Pending-delete confirmation target (null = dialog closed).
+  const [deletingThread, setDeletingThread] = useState<ThreadItem | null>(null);
 
   const threads = useThreads({
     status: statusFilter === "all" ? undefined : statusFilter,
     limit: 20,
   });
+
+  const startRename = useCallback((thread: ThreadItem) => {
+    setEditingThreadId(thread.id);
+    setEditingTitle(thread.title);
+    requestAnimationFrame(() => renameInputRef.current?.select());
+  }, []);
+
+  const cancelRename = useCallback(() => {
+    setEditingThreadId(null);
+    setEditingTitle("");
+  }, []);
+
+  const saveRename = useCallback(async () => {
+    const id = editingThreadId;
+    const title = editingTitle.trim();
+    if (!id || !title) {
+      cancelRename();
+      return;
+    }
+    const config = getConfig();
+    if (!config) return;
+    try {
+      await renameThreadApi(
+        config.deploymentUrl,
+        id,
+        title,
+        config.langsmithApiKey
+      );
+      await threads.mutate();
+    } finally {
+      cancelRename();
+    }
+  }, [editingThreadId, editingTitle, threads, cancelRename]);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deletingThread) return;
+    const config = getConfig();
+    if (!config) return;
+    const wasCurrent = deletingThread.id === currentThreadId;
+    try {
+      await deleteThreadApi(
+        config.deploymentUrl,
+        deletingThread.id,
+        config.langsmithApiKey
+      );
+      await threads.mutate();
+      if (wasCurrent) {
+        setCurrentThreadId(null);
+      }
+    } finally {
+      setDeletingThread(null);
+    }
+  }, [deletingThread, currentThreadId, threads, setCurrentThreadId]);
 
   const flattened = useMemo(() => {
     return threads.data?.flat() ?? [];
@@ -296,47 +370,144 @@ export function ThreadList({
                     {GROUP_LABELS[group]}
                   </h4>
                   <div className="flex flex-col gap-1">
-                    {groupThreads.map((thread) => (
-                      <button
-                        key={thread.id}
-                        type="button"
-                        onClick={() => onThreadSelect(thread.id)}
-                        className={cn(
-                          "grid w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-200",
-                          "hover:bg-accent",
-                          currentThreadId === thread.id
-                            ? "border border-primary bg-accent hover:bg-accent"
-                            : "border border-transparent bg-transparent"
-                        )}
-                        aria-current={currentThreadId === thread.id}
-                      >
-                        <div className="min-w-0 flex-1">
-                          {/* Title + Timestamp Row */}
-                          <div className="mb-1 flex items-center justify-between">
-                            <h3 className="truncate text-sm font-semibold">
-                              {thread.title}
-                            </h3>
-                            <span className="ml-2 flex-shrink-0 text-xs text-muted-foreground">
-                              {formatTime(thread.updatedAt)}
-                            </span>
-                          </div>
-                          {/* Description + Status Row */}
-                          <div className="flex items-center justify-between">
-                            <p className="flex-1 truncate text-sm text-muted-foreground">
-                              {thread.description}
-                            </p>
-                            <div className="ml-2 flex-shrink-0">
-                              <div
-                                className={cn(
-                                  "h-2 w-2 rounded-full",
-                                  getThreadColor(thread.status)
-                                )}
-                              />
+                    {groupThreads.map((thread) => {
+                      const isEditing = editingThreadId === thread.id;
+                      const isActive = currentThreadId === thread.id;
+                      return (
+                        <div
+                          key={thread.id}
+                          role="button"
+                          tabIndex={isEditing ? -1 : 0}
+                          aria-current={isActive}
+                          onClick={() => {
+                            if (isEditing) return;
+                            onThreadSelect(thread.id);
+                          }}
+                          onKeyDown={(e) => {
+                            if (isEditing) return;
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onThreadSelect(thread.id);
+                            }
+                          }}
+                          className={cn(
+                            "group/row relative grid w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-200",
+                            "hover:bg-accent",
+                            isActive
+                              ? "border border-primary bg-accent hover:bg-accent"
+                              : "border border-transparent bg-transparent"
+                          )}
+                        >
+                          <div className="min-w-0 flex-1">
+                            {/* Title + Timestamp Row */}
+                            <div className="mb-1 flex items-center justify-between">
+                              {isEditing ? (
+                                <div
+                                  className="flex flex-1 items-center gap-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Input
+                                    ref={renameInputRef}
+                                    value={editingTitle}
+                                    onChange={(e) =>
+                                      setEditingTitle(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        void saveRename();
+                                      } else if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        cancelRename();
+                                      }
+                                    }}
+                                    className="h-7 text-sm"
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    aria-label="Save title"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void saveRename();
+                                    }}
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    aria-label="Cancel rename"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      cancelRename();
+                                    }}
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <h3 className="truncate text-sm font-semibold">
+                                    {thread.title}
+                                  </h3>
+                                  <span className="ml-2 flex-shrink-0 text-xs text-muted-foreground">
+                                    {formatTime(thread.updatedAt)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                            {/* Description + Status Row */}
+                            <div className="flex items-center justify-between">
+                              <p className="flex-1 truncate text-sm text-muted-foreground">
+                                {thread.description}
+                              </p>
+                              <div className="ml-2 flex-shrink-0">
+                                <div
+                                  className={cn(
+                                    "h-2 w-2 rounded-full",
+                                    getThreadColor(thread.status)
+                                  )}
+                                />
+                              </div>
                             </div>
                           </div>
+                          {!isEditing && (
+                            <div
+                              className="absolute right-2 top-2 hidden gap-1 group-focus-within/row:flex group-hover/row:flex"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 bg-background/80 backdrop-blur-sm"
+                                aria-label="Rename thread"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startRename(thread);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 bg-background/80 text-destructive backdrop-blur-sm hover:text-destructive"
+                                aria-label="Delete thread"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingThread(thread);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -364,6 +535,37 @@ export function ThreadList({
           </div>
         )}
       </ScrollArea>
+
+      <Dialog
+        open={!!deletingThread}
+        onOpenChange={(open) => {
+          if (!open) setDeletingThread(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete thread?</DialogTitle>
+            <DialogDescription>
+              This permanently removes &quot;{deletingThread?.title}&quot; and
+              all of its messages. This action can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeletingThread(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

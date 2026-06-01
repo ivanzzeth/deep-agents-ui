@@ -14,6 +14,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ThreadList } from "@/app/components/ThreadList";
+import { AgentPicker } from "@/app/components/AgentPicker";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ChatInterface } from "@/app/components/ChatInterface";
 
@@ -132,10 +133,7 @@ function HomePageInner({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <div className="text-sm text-muted-foreground">
-              <span className="font-medium">Assistant:</span>{" "}
-              {config.assistantId}
-            </div>
+            <AgentPicker currentAssistantId={config.assistantId} />
             <Button
               variant="outline"
               size="sm"
