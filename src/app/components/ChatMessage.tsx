@@ -1,16 +1,22 @@
 "use client";
 
 import React, { useMemo, useState, useCallback } from "react";
+import type { ContentBlock } from "@langchain/core/messages";
 import { SubAgentIndicator } from "@/app/components/SubAgentIndicator";
 import { ToolCallBox } from "@/app/components/ToolCallBox";
 import { MarkdownContent } from "@/app/components/MarkdownContent";
+import { MultimodalPreview } from "@/app/components/MultimodalPreview";
 import type {
   SubAgent,
   ToolCall,
   ActionRequest,
   ReviewConfig,
 } from "@/app/types/types";
-import { Message } from "@langchain/langgraph-sdk";
+import {
+  type RichMessage,
+  type RichContentBlock,
+  isMultimodalBlock,
+} from "@/app/types/chat";
 import {
   extractSubAgentContent,
   extractStringFromMessageContent,
@@ -18,7 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface ChatMessageProps {
-  message: Message;
+  message: RichMessage;
   toolCalls: ToolCall[];
   isLoading?: boolean;
   actionRequestsMap?: Map<string, ActionRequest>;
@@ -27,6 +33,13 @@ interface ChatMessageProps {
   stream?: any;
   onResumeInterrupt?: (value: any) => void;
   graphId?: string;
+}
+
+function extractMediaBlocks(
+  content: RichMessage["content"],
+): ContentBlock.Multimodal.Data[] {
+  if (typeof content === "string") return [];
+  return content.filter((block: RichContentBlock) => isMultimodalBlock(block));
 }
 
 export const ChatMessage = React.memo<ChatMessageProps>(
@@ -43,7 +56,13 @@ export const ChatMessage = React.memo<ChatMessageProps>(
   }) => {
     const isUser = message.type === "human";
     const messageContent = extractStringFromMessageContent(message);
-    const hasContent = messageContent && messageContent.trim() !== "";
+    const hasTextContent = !!messageContent && messageContent.trim() !== "";
+    const mediaBlocks = useMemo(
+      () => (isUser ? extractMediaBlocks(message.content) : []),
+      [isUser, message.content],
+    );
+    const hasMediaContent = mediaBlocks.length > 0;
+    const showContent = hasTextContent || hasMediaContent;
     const hasToolCalls = toolCalls.length > 0;
     const subAgents = useMemo(() => {
       return toolCalls
@@ -97,29 +116,48 @@ export const ChatMessage = React.memo<ChatMessageProps>(
             isUser ? "max-w-[70%]" : "w-full"
           )}
         >
-          {hasContent && (
-            <div className={cn("relative flex items-end gap-0")}>
-              <div
-                className={cn(
-                  "mt-4 overflow-hidden break-words text-sm font-normal leading-[150%]",
-                  isUser
-                    ? "rounded-xl rounded-br-none border border-border px-3 py-2 text-foreground"
-                    : "text-primary"
-                )}
-                style={
-                  isUser
-                    ? { backgroundColor: "var(--color-user-message-bg)" }
-                    : undefined
-                }
-              >
-                {isUser ? (
-                  <p className="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
-                    {messageContent}
-                  </p>
-                ) : hasContent ? (
-                  <MarkdownContent content={messageContent} />
-                ) : null}
-              </div>
+          {showContent && (
+            <div
+              className={cn(
+                "relative flex gap-2",
+                isUser ? "flex-col items-end" : "items-end"
+              )}
+            >
+              {hasMediaContent && (
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  {mediaBlocks.map((block, idx) => (
+                    <MultimodalPreview
+                      key={idx}
+                      block={block}
+                      size="md"
+                    />
+                  ))}
+                </div>
+              )}
+              {hasTextContent && (
+                <div
+                  className={cn(
+                    "overflow-hidden break-words text-sm font-normal leading-[150%]",
+                    hasMediaContent ? "mt-0" : "mt-4",
+                    isUser
+                      ? "rounded-xl rounded-br-none border border-border px-3 py-2 text-foreground"
+                      : "text-primary"
+                  )}
+                  style={
+                    isUser
+                      ? { backgroundColor: "var(--color-user-message-bg)" }
+                      : undefined
+                  }
+                >
+                  {isUser ? (
+                    <p className="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
+                      {messageContent}
+                    </p>
+                  ) : (
+                    <MarkdownContent content={messageContent} />
+                  )}
+                </div>
+              )}
             </div>
           )}
           {hasToolCalls && (

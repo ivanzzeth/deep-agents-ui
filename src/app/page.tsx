@@ -208,7 +208,7 @@ function HomePageContent() {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [assistantId, setAssistantId] = useQueryState("assistantId");
 
-  // On mount, check for saved config, otherwise show config dialog
+  // On mount, prefer saved config, then env-provided defaults, otherwise dialog.
   useEffect(() => {
     const savedConfig = getConfig();
     if (savedConfig) {
@@ -216,9 +216,22 @@ function HomePageContent() {
       if (!assistantId) {
         setAssistantId(savedConfig.assistantId);
       }
-    } else {
-      setConfigDialogOpen(true);
+      return;
     }
+    const envUrl = process.env.NEXT_PUBLIC_API_URL;
+    const envAssistantId = process.env.NEXT_PUBLIC_ASSISTANT_ID;
+    if (envUrl && envAssistantId) {
+      const envConfig: StandaloneConfig = {
+        deploymentUrl: envUrl,
+        assistantId: envAssistantId,
+      };
+      setConfig(envConfig);
+      if (!assistantId) {
+        setAssistantId(envConfig.assistantId);
+      }
+      return;
+    }
+    setConfigDialogOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

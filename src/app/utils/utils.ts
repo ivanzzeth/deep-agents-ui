@@ -1,4 +1,5 @@
 import { Message } from "@langchain/langgraph-sdk";
+import type { RichMessage } from "@/app/types/chat";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -6,7 +7,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function extractStringFromMessageContent(message: Message): string {
+export function extractStringFromMessageContent(
+  message: RichMessage | Message,
+): string {
   return typeof message.content === "string"
     ? message.content
     : Array.isArray(message.content)

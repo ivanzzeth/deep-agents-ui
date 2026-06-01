@@ -10,6 +10,13 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import type { UseStreamThread } from "@langchain/langgraph-sdk/react";
 import type { TodoItem } from "@/app/types/types";
+import {
+  type RichMessage,
+  type RichMessageContent,
+  type SendInput,
+  fromSdkMessages,
+  toSdkMessages,
+} from "@/app/types/chat";
 import { useClient } from "@/providers/ClientProvider";
 import { useQueryState } from "nuqs";
 
@@ -54,13 +61,17 @@ export function useChat({
   });
 
   const sendMessage = useCallback(
-    (content: string) => {
-      const newMessage: Message = { id: uuidv4(), type: "human", content };
+    (input: SendInput) => {
+      const content: RichMessageContent = input.attachments?.length
+        ? [{ type: "text", text: input.text }, ...input.attachments]
+        : input.text;
+      const newMessage: RichMessage = { id: uuidv4(), type: "human", content };
+      const sdkPayload = toSdkMessages([newMessage]);
       stream.submit(
-        { messages: [newMessage] },
+        { messages: sdkPayload },
         {
           optimisticValues: (prev) => ({
-            messages: [...(prev.messages ?? []), newMessage],
+            messages: [...(prev.messages ?? []), ...sdkPayload],
           }),
           config: { ...(activeAssistant?.config ?? {}), recursion_limit: 100 },
         }
@@ -152,7 +163,7 @@ export function useChat({
     email: stream.values.email,
     ui: stream.values.ui,
     setFiles,
-    messages: stream.messages,
+    messages: fromSdkMessages(stream.messages),
     isLoading: stream.isLoading,
     isThreadLoading: stream.isThreadLoading,
     interrupt: stream.interrupt,

@@ -16,15 +16,19 @@ import {
   Clock,
   Circle,
   FileIcon,
+  Paperclip,
 } from "lucide-react";
 import { ChatMessage } from "@/app/components/ChatMessage";
+import { ContentBlocksPreview } from "@/app/components/ContentBlocksPreview";
+import { useFileUpload } from "@/app/hooks/use-file-upload";
 import type {
   TodoItem,
   ToolCall,
   ActionRequest,
   ReviewConfig,
 } from "@/app/types/types";
-import { Assistant, Message } from "@langchain/langgraph-sdk";
+import { Assistant } from "@langchain/langgraph-sdk";
+import type { RichMessage } from "@/app/types/chat";
 import { extractStringFromMessageContent } from "@/app/utils/utils";
 import { useChatContext } from "@/providers/ChatProvider";
 import { cn } from "@/lib/utils";
@@ -65,9 +69,19 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
   const [metaOpen, setMetaOpen] = useState<"tasks" | "files" | null>(null);
   const tasksContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [input, setInput] = useState("");
   const { scrollRef, contentRef } = useStickToBottom();
+  const {
+    contentBlocks,
+    handleFileUpload,
+    dropRef,
+    removeBlock,
+    resetBlocks,
+    dragOver,
+    handlePaste,
+  } = useFileUpload();
 
   const {
     stream,
@@ -92,11 +106,21 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
         e.preventDefault();
       }
       const messageText = input.trim();
-      if (!messageText || isLoading || submitDisabled) return;
-      sendMessage(messageText);
+      const hasContent = messageText.length > 0 || contentBlocks.length > 0;
+      if (!hasContent || isLoading || submitDisabled) return;
+      sendMessage({ text: messageText, attachments: contentBlocks });
       setInput("");
+      resetBlocks();
     },
-    [input, isLoading, sendMessage, setInput, submitDisabled]
+    [
+      input,
+      contentBlocks,
+      isLoading,
+      sendMessage,
+      setInput,
+      submitDisabled,
+      resetBlocks,
+    ]
   );
 
   const handleKeyDown = useCallback(
@@ -119,9 +143,9 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     */
     const messageMap = new Map<
       string,
-      { message: Message; toolCalls: ToolCall[] }
+      { message: RichMessage; toolCalls: ToolCall[] }
     >();
-    messages.forEach((message: Message) => {
+    messages.forEach((message: RichMessage) => {
       if (message.type === "ai") {
         const toolCallsInMessage: Array<{
           id?: string;
@@ -504,22 +528,59 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
             onSubmit={handleSubmit}
             className="flex flex-col"
           >
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={isLoading ? "Running..." : "Write your message..."}
-              className="font-inherit field-sizing-content flex-1 resize-none border-0 bg-transparent px-[18px] pb-[13px] pt-[14px] text-sm leading-7 text-primary outline-none placeholder:text-tertiary"
-              rows={1}
-            />
+            <div
+              ref={dropRef}
+              className={cn(
+                "flex flex-col rounded-md transition-shadow",
+                dragOver && "ring-2 ring-primary/50"
+              )}
+            >
+              <ContentBlocksPreview
+                blocks={contentBlocks}
+                onRemove={removeBlock}
+                size="sm"
+              />
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                placeholder={isLoading ? "Running..." : "Write your message..."}
+                className="font-inherit field-sizing-content flex-1 resize-none border-0 bg-transparent px-[18px] pb-[13px] pt-[14px] text-sm leading-7 text-primary outline-none placeholder:text-tertiary"
+                rows={1}
+              />
+            </div>
             <div className="flex justify-between gap-2 p-3">
+              <div className="flex justify-start gap-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  multiple
+                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  aria-label="Attach file"
+                >
+                  <Paperclip size={18} />
+                </Button>
+              </div>
               <div className="flex justify-end gap-2">
                 <Button
                   type={isLoading ? "button" : "submit"}
                   variant={isLoading ? "destructive" : "default"}
                   onClick={isLoading ? stopStream : handleSubmit}
-                  disabled={!isLoading && (submitDisabled || !input.trim())}
+                  disabled={
+                    !isLoading &&
+                    (submitDisabled ||
+                      (!input.trim() && contentBlocks.length === 0))
+                  }
                 >
                   {isLoading ? (
                     <>
