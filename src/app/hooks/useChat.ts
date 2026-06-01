@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import {
   type Message,
@@ -32,6 +32,14 @@ export type StateType = {
   ui?: any;
 };
 
+function isHttpStatusError(err: unknown): err is Error & { status: number } {
+  return (
+    err instanceof Error &&
+    "status" in err &&
+    typeof (err as { status: unknown }).status === "number"
+  );
+}
+
 export function useChat({
   activeAssistant,
   onHistoryRevalidate,
@@ -44,6 +52,25 @@ export function useChat({
   const [threadId, setThreadId] = useQueryState("threadId");
   const client = useClient();
 
+  // A thread that langgraph dev no longer knows about (server restarted,
+  // pickle wiped, thread deleted by another tab) shows up here as a 404.
+  // Clear the URL so the next render starts a fresh conversation instead
+  // of looping retries against a thread that won't come back.
+  const handleStreamError = useCallback(
+    (err: unknown) => {
+      if (
+        isHttpStatusError(err) &&
+        err.status === 404 &&
+        /thread/i.test(err.message)
+      ) {
+        console.warn("[useChat] thread no longer exists; clearing URL:", err.message);
+        void setThreadId(null);
+      }
+      onHistoryRevalidate?.();
+    },
+    [setThreadId, onHistoryRevalidate],
+  );
+
   const stream = useStream<StateType>({
     assistantId: activeAssistant?.assistant_id || "",
     client: client ?? undefined,
@@ -55,10 +82,26 @@ export function useChat({
     fetchStateHistory: true,
     // Revalidate thread list when stream finishes, errors, or creates new thread
     onFinish: onHistoryRevalidate,
-    onError: onHistoryRevalidate,
+    onError: handleStreamError,
     onCreated: onHistoryRevalidate,
     experimental_thread: thread,
   });
+
+  // Belt-and-suspenders: if the SDK exposes a 404-on-thread error via
+  // `stream.error` without firing `onError` (e.g. when initial state
+  // fetch retries exhaust), clear the URL the same way.
+  useEffect(() => {
+    const err = stream.error;
+    if (
+      err &&
+      isHttpStatusError(err) &&
+      err.status === 404 &&
+      /thread/i.test(err.message)
+    ) {
+      console.warn("[useChat] stream.error 404 on thread; clearing URL:", err.message);
+      void setThreadId(null);
+    }
+  }, [stream.error, setThreadId]);
 
   const sendMessage = useCallback(
     (input: SendInput) => {
