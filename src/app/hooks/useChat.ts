@@ -19,6 +19,7 @@ import {
 } from "@/app/types/chat";
 import { useClient } from "@/providers/ClientProvider";
 import { useQueryState } from "nuqs";
+import { useTenant } from "@/app/hooks/useTenant";
 
 export type StateType = {
   messages: Message[];
@@ -51,6 +52,29 @@ export function useChat({
 }) {
   const [threadId, setThreadId] = useQueryState("threadId");
   const client = useClient();
+  const { tenantId } = useTenant();
+
+  // Tag freshly-created threads with the current tenant. Without this,
+  // ThreadList can't filter by tenant — langgraph dev auto-creates the
+  // thread on first submit and only the server-side run config sees the
+  // tenant id.
+  const tagThreadWithTenant = useCallback(
+    async (newThreadId: string) => {
+      try {
+        await client.threads.update(newThreadId, {
+          metadata: { tenant_id: tenantId },
+        });
+      } catch (err) {
+        console.warn(
+          "[useChat] failed to tag thread with tenant",
+          newThreadId,
+          tenantId,
+          err
+        );
+      }
+    },
+    [client, tenantId]
+  );
 
   // A thread that langgraph dev no longer knows about (server restarted,
   // pickle wiped, thread deleted by another tab) shows up here as a 404.
@@ -83,7 +107,12 @@ export function useChat({
     // Revalidate thread list when stream finishes, errors, or creates new thread
     onFinish: onHistoryRevalidate,
     onError: handleStreamError,
-    onCreated: onHistoryRevalidate,
+    onCreated: (meta) => {
+      if (meta?.thread_id) {
+        void tagThreadWithTenant(meta.thread_id);
+      }
+      onHistoryRevalidate?.();
+    },
     experimental_thread: thread,
   });
 
@@ -103,6 +132,29 @@ export function useChat({
     }
   }, [stream.error, setThreadId]);
 
+  // Every run carries the active tenant id in `configurable` so the
+  // backend MemoryRecallMiddleware + memory_save/recall tools can scope
+  // long-term memory to ("tenant", tenantId, "memory"). Recursion limit
+  // is folded in here too so callers never forget it.
+  const buildConfig = useCallback(
+    (extra?: Record<string, unknown>) => {
+      const base = activeAssistant?.config ?? {};
+      const baseConfigurable =
+        (base as { configurable?: Record<string, unknown> }).configurable ?? {};
+      return {
+        ...base,
+        recursion_limit: 100,
+        ...extra,
+        configurable: {
+          ...baseConfigurable,
+          tenant_id: tenantId,
+          ...((extra as { configurable?: Record<string, unknown> })?.configurable ?? {}),
+        },
+      };
+    },
+    [activeAssistant?.config, tenantId]
+  );
+
   const sendMessage = useCallback(
     (input: SendInput) => {
       const content: RichMessageContent = input.attachments?.length
@@ -116,13 +168,13 @@ export function useChat({
           optimisticValues: (prev) => ({
             messages: [...(prev.messages ?? []), ...sdkPayload],
           }),
-          config: { ...(activeAssistant?.config ?? {}), recursion_limit: 100 },
+          config: buildConfig(),
         }
       );
       // Update thread list immediately when sending a message
       onHistoryRevalidate?.();
     },
-    [stream, activeAssistant?.config, onHistoryRevalidate]
+    [stream, buildConfig, onHistoryRevalidate]
   );
 
   const runSingleStep = useCallback(
@@ -137,7 +189,7 @@ export function useChat({
           ...(optimisticMessages
             ? { optimisticValues: { messages: optimisticMessages } }
             : {}),
-          config: activeAssistant?.config,
+          config: buildConfig(),
           checkpoint: checkpoint,
           ...(isRerunningSubagent
             ? { interruptAfter: ["tools"] }
@@ -146,11 +198,11 @@ export function useChat({
       } else {
         stream.submit(
           { messages },
-          { config: activeAssistant?.config, interruptBefore: ["tools"] }
+          { config: buildConfig(), interruptBefore: ["tools"] }
         );
       }
     },
-    [stream, activeAssistant?.config]
+    [stream, buildConfig]
   );
 
   const setFiles = useCallback(
@@ -166,10 +218,7 @@ export function useChat({
   const continueStream = useCallback(
     (hasTaskToolCall?: boolean) => {
       stream.submit(undefined, {
-        config: {
-          ...(activeAssistant?.config || {}),
-          recursion_limit: 100,
-        },
+        config: buildConfig(),
         ...(hasTaskToolCall
           ? { interruptAfter: ["tools"] }
           : { interruptBefore: ["tools"] }),
@@ -177,7 +226,7 @@ export function useChat({
       // Update thread list when continuing stream
       onHistoryRevalidate?.();
     },
-    [stream, activeAssistant?.config, onHistoryRevalidate]
+    [stream, buildConfig, onHistoryRevalidate]
   );
 
   const markCurrentThreadAsResolved = useCallback(() => {

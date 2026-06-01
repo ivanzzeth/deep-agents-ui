@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/resizable";
 import { ThreadList } from "@/app/components/ThreadList";
 import { AgentPicker } from "@/app/components/AgentPicker";
+import { TenantPicker } from "@/app/components/TenantPicker";
 import { HistoryDialog } from "@/app/components/HistoryDialog";
 import { RunsDialog } from "@/app/components/RunsDialog";
 import { GraphDialog } from "@/app/components/GraphDialog";
@@ -150,6 +151,14 @@ function HomePageInner({
             )}
           </div>
           <div className="flex items-center gap-2">
+            <TenantPicker
+              onSwitch={() => {
+                // Threads are bound to the tenant they were created with;
+                // dropping the current threadId starts the new tenant
+                // fresh instead of trying to load a thread it can't see.
+                void setThreadId(null);
+              }}
+            />
             <AgentPicker currentAssistantId={config.assistantId} />
             <Button
               variant="outline"

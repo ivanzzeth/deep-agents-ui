@@ -58,6 +58,10 @@ const DEFAULT_PAGE_SIZE = 20;
 export function useThreads(props: {
   status?: Thread["status"];
   limit?: number;
+  /** When set, only threads whose `metadata.tenant_id` matches this id
+   *  (or are untagged) appear. Tenant scoping is enforced server-side via
+   *  the `metadata` filter on `client.threads.search`. */
+  tenantId?: string;
 }) {
   const pageSize = props.limit || DEFAULT_PAGE_SIZE;
 
@@ -86,6 +90,7 @@ export function useThreads(props: {
         assistantId: config.assistantId,
         apiKey,
         status: props?.status,
+        tenantId: props?.tenantId,
       };
     },
     async ({
@@ -95,6 +100,7 @@ export function useThreads(props: {
       status,
       pageIndex,
       pageSize,
+      tenantId,
     }: {
       kind: "threads";
       pageIndex: number;
@@ -103,6 +109,7 @@ export function useThreads(props: {
       assistantId: string;
       apiKey: string;
       status?: Thread["status"];
+      tenantId?: string;
     }) => {
       const client = new Client({
         apiUrl: deploymentUrl,
@@ -115,15 +122,22 @@ export function useThreads(props: {
           assistantId
         );
 
+      // Compose metadata filters. The tenant_id filter is intentionally
+      // strict (exact match); legacy threads without the tag won't show
+      // until they're tagged or the user picks "default".
+      const metadataFilter: Record<string, string> = {};
+      if (isUUID) metadataFilter.assistant_id = assistantId;
+      if (tenantId) metadataFilter.tenant_id = tenantId;
+
       const threads = await client.threads.search({
         limit: pageSize,
         offset: pageIndex * pageSize,
         sortBy: "updated_at" as const,
         sortOrder: "desc" as const,
         status,
-        // Only filter by assistant_id metadata for deployed graphs (UUIDs)
-        // Local dev graphs don't set this metadata
-        ...(isUUID ? { metadata: { assistant_id: assistantId } } : {}),
+        ...(Object.keys(metadataFilter).length
+          ? { metadata: metadataFilter }
+          : {}),
       });
 
       return threads.map((thread): ThreadItem => {

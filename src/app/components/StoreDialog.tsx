@@ -13,8 +13,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { getConfig } from "@/lib/config";
+import { useTenant } from "@/app/hooks/useTenant";
 
 /**
  * Browse the LangGraph Store — the cross-thread key/value memory layer.
@@ -31,18 +34,29 @@ export function StoreDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [activeNs, setActiveNs] = useState<string[] | null>(null);
+  const { tenantId } = useTenant();
+  // Default to scoping the listing to the active tenant; flip this off
+  // for an admin-style "all namespaces in the store" view (useful when
+  // debugging which tenants exist).
+  const [scopeToTenant, setScopeToTenant] = useState(true);
 
-  const namespaces = useSWR(open ? "store-namespaces" : null, async () => {
-    const config = getConfig();
-    if (!config) return { namespaces: [] };
-    const client = new Client({
-      apiUrl: config.deploymentUrl,
-      defaultHeaders: config.langsmithApiKey
-        ? { "X-Api-Key": config.langsmithApiKey }
-        : {},
-    });
-    return await client.store.listNamespaces({ limit: 200 });
-  });
+  const namespaces = useSWR(
+    open ? ["store-namespaces", scopeToTenant ? tenantId : "*"] : null,
+    async () => {
+      const config = getConfig();
+      if (!config) return { namespaces: [] };
+      const client = new Client({
+        apiUrl: config.deploymentUrl,
+        defaultHeaders: config.langsmithApiKey
+          ? { "X-Api-Key": config.langsmithApiKey }
+          : {},
+      });
+      return await client.store.listNamespaces({
+        limit: 200,
+        ...(scopeToTenant ? { prefix: ["tenant", tenantId] } : {}),
+      });
+    }
+  );
 
   const items = useSWR(
     open && activeNs ? ["store-items", activeNs.join("/")] : null,
@@ -71,8 +85,24 @@ export function StoreDialog({
             Store
           </DialogTitle>
           <DialogDescription>
-            Cross-thread persistent memory. Pick a namespace to see items.
+            Cross-thread persistent memory. Each tenant gets its own
+            namespace under <code>(&quot;tenant&quot;, &lt;id&gt;, ...)</code>.
+            Empty here means the agent has never called{" "}
+            <code>memory_save</code> for this tenant yet.
           </DialogDescription>
+          <div className="flex items-center gap-2 pt-1">
+            <Switch
+              id="store-tenant-scope"
+              checked={scopeToTenant}
+              onCheckedChange={setScopeToTenant}
+            />
+            <Label
+              htmlFor="store-tenant-scope"
+              className="text-xs text-muted-foreground"
+            >
+              Scope to current tenant ({tenantId})
+            </Label>
+          </div>
         </DialogHeader>
         <div className="grid h-[60vh] grid-cols-[260px_1fr] gap-3">
           <ScrollArea className="rounded-md border border-border">

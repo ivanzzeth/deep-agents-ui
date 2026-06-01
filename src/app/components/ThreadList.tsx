@@ -43,6 +43,7 @@ import {
   renameThread as renameThreadApi,
   useThreads,
 } from "@/app/hooks/useThreads";
+import { useTenant } from "@/app/hooks/useTenant";
 
 type StatusFilter = "all" | "idle" | "busy" | "interrupted" | "error";
 
@@ -158,9 +159,11 @@ export function ThreadList({
   // Pending-delete confirmation target (null = dialog closed).
   const [deletingThread, setDeletingThread] = useState<ThreadItem | null>(null);
 
+  const { tenantId } = useTenant();
   const threads = useThreads({
     status: statusFilter === "all" ? undefined : statusFilter,
     limit: 20,
+    tenantId,
   });
 
   const startRename = useCallback((thread: ThreadItem) => {
