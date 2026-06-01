@@ -37,13 +37,27 @@ export function ToolApprovalInterrupt({
     });
   };
 
+  // LangChain's HumanInTheLoopMiddleware writes our `message` field
+  // directly as the rejected tool call's ToolMessage content — it
+  // REPLACES the default "User rejected the tool call..." text. If the
+  // user types only a free-form reason (e.g. "我在测试"), the agent
+  // sees that string as the tool's result with no rejection signal and
+  // happily proceeds as if the tool had succeeded. Prefix the user's
+  // reason here so the agent always sees an unambiguous rejection.
+  const buildRejectMessage = (reason: string): string => {
+    const trimmed = reason.trim();
+    return trimmed
+      ? `User rejected the ${actionRequest.name} tool call. Reason: ${trimmed}`
+      : `User rejected the ${actionRequest.name} tool call. Do not retry; ask the user before attempting this again.`;
+  };
+
   const handleReject = () => {
     if (showRejectionInput) {
       onResume({
         decisions: [
           {
             type: "reject",
-            message: rejectionMessage.trim(),
+            message: buildRejectMessage(rejectionMessage),
           },
         ],
       });
@@ -57,7 +71,7 @@ export function ToolApprovalInterrupt({
       decisions: [
         {
           type: "reject",
-          message: rejectionMessage.trim(),
+          message: buildRejectMessage(rejectionMessage),
         },
       ],
     });
