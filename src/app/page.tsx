@@ -208,30 +208,33 @@ function HomePageContent() {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [assistantId, setAssistantId] = useQueryState("assistantId");
 
-  // On mount, prefer saved config, then env-provided defaults, otherwise dialog.
+  // Resolution precedence: URL `assistantId` query > localStorage > NEXT_PUBLIC_*
+  // env > config dialog. The URL value is treated as a transient override —
+  // it drives the current session but does NOT clobber the saved default in
+  // localStorage. The Settings dialog reflects whatever's currently active.
   useEffect(() => {
     const savedConfig = getConfig();
-    if (savedConfig) {
-      setConfig(savedConfig);
-      if (!assistantId) {
-        setAssistantId(savedConfig.assistantId);
-      }
-      return;
-    }
     const envUrl = process.env.NEXT_PUBLIC_API_URL;
     const envAssistantId = process.env.NEXT_PUBLIC_ASSISTANT_ID;
-    if (envUrl && envAssistantId) {
-      const envConfig: StandaloneConfig = {
-        deploymentUrl: envUrl,
-        assistantId: envAssistantId,
-      };
-      setConfig(envConfig);
-      if (!assistantId) {
-        setAssistantId(envConfig.assistantId);
-      }
+
+    const base: StandaloneConfig | null =
+      savedConfig ??
+      (envUrl && envAssistantId
+        ? { deploymentUrl: envUrl, assistantId: envAssistantId }
+        : null);
+
+    if (!base) {
+      setConfigDialogOpen(true);
       return;
     }
-    setConfigDialogOpen(true);
+
+    const effective: StandaloneConfig = assistantId
+      ? { ...base, assistantId }
+      : base;
+    setConfig(effective);
+    if (!assistantId) {
+      setAssistantId(effective.assistantId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -241,6 +244,14 @@ function HomePageContent() {
       setAssistantId(config.assistantId);
     }
   }, [config, assistantId, setAssistantId]);
+
+  // Keep config.assistantId in sync with URL changes that happen *after* mount
+  // (e.g. user clicks a link with a different ?assistantId). Without this the
+  // initial-mount effect above would be the only place URL→config flows.
+  useEffect(() => {
+    if (!config || !assistantId || assistantId === config.assistantId) return;
+    setConfig({ ...config, assistantId });
+  }, [assistantId, config]);
 
   const handleSaveConfig = useCallback((newConfig: StandaloneConfig) => {
     saveConfig(newConfig);
