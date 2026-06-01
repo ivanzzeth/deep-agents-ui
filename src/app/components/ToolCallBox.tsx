@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   ChevronDown,
   ChevronUp,
@@ -41,6 +41,16 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
     const [isExpanded, setIsExpanded] = useState(
       () => !!uiComponent || !!actionRequest
     );
+    // langgraph-sdk delivers the interrupt asynchronously: the first
+    // render of this box can land before `actionRequest` is populated,
+    // so the `useState` initializer above misses it and leaves the box
+    // collapsed. Force-expand on every transition into "needs approval"
+    // or "has UI component" so the user actually sees the prompt.
+    useEffect(() => {
+      if (actionRequest || uiComponent) {
+        setIsExpanded(true);
+      }
+    }, [actionRequest, uiComponent]);
     const [expandedArgs, setExpandedArgs] = useState<Record<string, boolean>>(
       {}
     );

@@ -230,18 +230,31 @@ export function useChat({
   );
 
   const markCurrentThreadAsResolved = useCallback(() => {
-    stream.submit(null, { command: { goto: "__end__", update: null } });
+    stream.submit(null, {
+      command: { goto: "__end__", update: null },
+      // Carry tenant_id forward so any cleanup hook the agent runs can
+      // still see which tenant's namespace it's operating against.
+      config: buildConfig(),
+    });
     // Update thread list when marking thread as resolved
     onHistoryRevalidate?.();
-  }, [stream, onHistoryRevalidate]);
+  }, [stream, buildConfig, onHistoryRevalidate]);
 
   const resumeInterrupt = useCallback(
     (value: any) => {
-      stream.submit(null, { command: { resume: value } });
+      // CRITICAL: resume after HITL approval is a new submit, and
+      // langgraph treats its config as authoritative. Forgetting to
+      // pass tenant_id here was causing the resumed memory_save call
+      // to land in the "default" namespace even when the user was
+      // logged in as a specific tenant.
+      stream.submit(null, {
+        command: { resume: value },
+        config: buildConfig(),
+      });
       // Update thread list when resuming from interrupt
       onHistoryRevalidate?.();
     },
-    [stream, onHistoryRevalidate]
+    [stream, buildConfig, onHistoryRevalidate]
   );
 
   const stopStream = useCallback(() => {
