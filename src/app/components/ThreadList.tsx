@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { format } from "date-fns";
-import { Check, Loader2, MessageSquare, Pencil, Trash2, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Loader2,
+  MessageSquare,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useQueryState } from "nuqs";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { getConfig } from "@/lib/config";
 import type { ThreadItem } from "@/app/hooks/useThreads";
 import {
+  copyThread as copyThreadApi,
   deleteThread as deleteThreadApi,
   renameThread as renameThreadApi,
   useThreads,
@@ -184,6 +193,21 @@ export function ThreadList({
       cancelRename();
     }
   }, [editingThreadId, editingTitle, threads, cancelRename]);
+
+  const forkThread = useCallback(
+    async (thread: ThreadItem) => {
+      const config = getConfig();
+      if (!config) return;
+      const newId = await copyThreadApi(
+        config.deploymentUrl,
+        thread.id,
+        config.langsmithApiKey
+      );
+      await threads.mutate();
+      onThreadSelect(newId);
+    },
+    [threads, onThreadSelect]
+  );
 
   const confirmDelete = useCallback(async () => {
     if (!deletingThread) return;
@@ -490,6 +514,18 @@ export function ThreadList({
                                 }}
                               >
                                 <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 bg-background/80 backdrop-blur-sm"
+                                aria-label="Fork thread"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void forkThread(thread);
+                                }}
+                              >
+                                <Copy className="h-3 w-3" />
                               </Button>
                               <Button
                                 variant="ghost"

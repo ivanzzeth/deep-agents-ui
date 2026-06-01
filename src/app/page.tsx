@@ -7,7 +7,7 @@ import { ConfigDialog } from "@/app/components/ConfigDialog";
 import { Button } from "@/components/ui/button";
 import { Assistant } from "@langchain/langgraph-sdk";
 import { ClientProvider, useClient } from "@/providers/ClientProvider";
-import { Settings, MessagesSquare, SquarePen } from "lucide-react";
+import { History, MessagesSquare, Settings, SquarePen } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/resizable";
 import { ThreadList } from "@/app/components/ThreadList";
 import { AgentPicker } from "@/app/components/AgentPicker";
+import { HistoryDialog } from "@/app/components/HistoryDialog";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ChatInterface } from "@/app/components/ChatInterface";
 
@@ -33,6 +34,7 @@ function HomePageInner({
 }: HomePageInnerProps) {
   const client = useClient();
   const [threadId, setThreadId] = useQueryState("threadId");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [sidebar, setSidebar] = useQueryState("sidebar");
 
   const [mutateThreads, setMutateThreads] = useState<(() => void) | null>(null);
@@ -111,6 +113,10 @@ function HomePageInner({
         onSave={handleSaveConfig}
         initialConfig={config}
       />
+      <HistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+      />
       <div className="flex h-screen flex-col">
         <header className="flex h-16 items-center justify-between border-b border-border px-6">
           <div className="flex items-center gap-4">
@@ -134,6 +140,15 @@ function HomePageInner({
           </div>
           <div className="flex items-center gap-2">
             <AgentPicker currentAssistantId={config.assistantId} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setHistoryOpen(true)}
+              disabled={!threadId}
+            >
+              <History className="mr-2 h-4 w-4" />
+              History
+            </Button>
             <Button
               variant="outline"
               size="sm"

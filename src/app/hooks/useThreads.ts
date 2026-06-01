@@ -31,6 +31,19 @@ export async function deleteThread(
   await makeClient(deploymentUrl, apiKey).threads.delete(threadId);
 }
 
+/**
+ * Fork a thread — server copies the full checkpoint history into a new
+ * thread. Returns the new thread id so the caller can navigate to it.
+ */
+export async function copyThread(
+  deploymentUrl: string,
+  threadId: string,
+  apiKey?: string
+): Promise<string> {
+  const copy = await makeClient(deploymentUrl, apiKey).threads.copy(threadId);
+  return copy.thread_id;
+}
+
 export interface ThreadItem {
   id: string;
   updatedAt: Date;
