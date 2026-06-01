@@ -7,7 +7,15 @@ import { ConfigDialog } from "@/app/components/ConfigDialog";
 import { Button } from "@/components/ui/button";
 import { Assistant } from "@langchain/langgraph-sdk";
 import { ClientProvider, useClient } from "@/providers/ClientProvider";
-import { History, MessagesSquare, Settings, SquarePen } from "lucide-react";
+import {
+  Activity,
+  Database,
+  History,
+  MessagesSquare,
+  Network,
+  Settings,
+  SquarePen,
+} from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -16,6 +24,9 @@ import {
 import { ThreadList } from "@/app/components/ThreadList";
 import { AgentPicker } from "@/app/components/AgentPicker";
 import { HistoryDialog } from "@/app/components/HistoryDialog";
+import { RunsDialog } from "@/app/components/RunsDialog";
+import { GraphDialog } from "@/app/components/GraphDialog";
+import { StoreDialog } from "@/app/components/StoreDialog";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ChatInterface } from "@/app/components/ChatInterface";
 
@@ -36,6 +47,9 @@ function HomePageInner({
   const [threadId, setThreadId] = useQueryState("threadId");
   const [, setUrlAssistantId] = useQueryState("assistantId");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [runsOpen, setRunsOpen] = useState(false);
+  const [graphOpen, setGraphOpen] = useState(false);
+  const [storeOpen, setStoreOpen] = useState(false);
   const [sidebar, setSidebar] = useQueryState("sidebar");
 
   const [mutateThreads, setMutateThreads] = useState<(() => void) | null>(null);
@@ -149,6 +163,32 @@ function HomePageInner({
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setRunsOpen(true)}
+              disabled={!threadId}
+            >
+              <Activity className="mr-2 h-4 w-4" />
+              Runs
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setGraphOpen(true)}
+              disabled={!assistant}
+            >
+              <Network className="mr-2 h-4 w-4" />
+              Graph
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStoreOpen(true)}
+            >
+              <Database className="mr-2 h-4 w-4" />
+              Store
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setConfigDialogOpen(true)}
             >
               <Settings className="mr-2 h-4 w-4" />
@@ -215,6 +255,20 @@ function HomePageInner({
                   onOpenChange={setHistoryOpen}
                 />
               </ChatProvider>
+              <RunsDialog
+                open={runsOpen}
+                onOpenChange={setRunsOpen}
+                threadId={threadId}
+              />
+              <GraphDialog
+                open={graphOpen}
+                onOpenChange={setGraphOpen}
+                assistantId={assistant?.assistant_id ?? null}
+              />
+              <StoreDialog
+                open={storeOpen}
+                onOpenChange={setStoreOpen}
+              />
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
