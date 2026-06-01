@@ -117,10 +117,10 @@ export const ChatMessage = React.memo<ChatMessageProps>(
           "inline-flex items-center gap-1 self-center rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground",
           "opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/msg:opacity-100 focus-visible:opacity-100"
         )}
-        title="从这里 fork 一个新分支，重新跑后续 turn"
+        title="Fork a new branch from this point and re-run the rest"
       >
         <GitBranch className="h-3 w-3" />
-        <span className="hidden sm:inline">从这里重开</span>
+        <span className="hidden sm:inline">Fork from here</span>
       </button>
     ) : null;
 
