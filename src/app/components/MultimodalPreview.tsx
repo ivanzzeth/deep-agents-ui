@@ -43,7 +43,7 @@ export const MultimodalPreview: React.FC<MultimodalPreviewProps> = ({
         {removable && (
           <button
             type="button"
-            className="absolute top-1 right-1 z-10 rounded-full bg-gray-500 text-white hover:bg-gray-700"
+            className="absolute right-1 top-1 z-10 rounded-full bg-gray-500 text-white hover:bg-gray-700"
             onClick={onRemove}
             aria-label="Remove image"
           >
@@ -62,19 +62,19 @@ export const MultimodalPreview: React.FC<MultimodalPreviewProps> = ({
       <div
         className={cn(
           "relative flex items-start gap-2 rounded-md border bg-gray-100 px-3 py-2",
-          className,
+          className
         )}
       >
         <div className="flex flex-shrink-0 flex-col items-start justify-start">
           <File
             className={cn(
               "text-teal-700",
-              size === "sm" ? "h-5 w-5" : "h-7 w-7",
+              size === "sm" ? "h-5 w-5" : "h-7 w-7"
             )}
           />
         </div>
         <span
-          className={cn("min-w-0 flex-1 text-sm break-all text-gray-800")}
+          className={cn("min-w-0 flex-1 break-all text-sm text-gray-800")}
           style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}
         >
           {String(filename)}
@@ -98,7 +98,7 @@ export const MultimodalPreview: React.FC<MultimodalPreviewProps> = ({
     <div
       className={cn(
         "flex items-center gap-2 rounded-md border bg-gray-100 px-3 py-2 text-gray-500",
-        className,
+        className
       )}
     >
       <File className="h-5 w-5 flex-shrink-0" />

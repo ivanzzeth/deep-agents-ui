@@ -36,7 +36,7 @@ interface ChatMessageProps {
 }
 
 function extractMediaBlocks(
-  content: RichMessage["content"],
+  content: RichMessage["content"]
 ): ContentBlock.Multimodal.Data[] {
   if (typeof content === "string") return [];
   return content.filter((block: RichContentBlock) => isMultimodalBlock(block));
@@ -59,7 +59,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     const hasTextContent = !!messageContent && messageContent.trim() !== "";
     const mediaBlocks = useMemo(
       () => (isUser ? extractMediaBlocks(message.content) : []),
-      [isUser, message.content],
+      [isUser, message.content]
     );
     const hasMediaContent = mediaBlocks.length > 0;
     const showContent = hasTextContent || hasMediaContent;

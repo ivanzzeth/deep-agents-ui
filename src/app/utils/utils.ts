@@ -8,7 +8,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function extractStringFromMessageContent(
-  message: RichMessage | Message,
+  message: RichMessage | Message
 ): string {
   return typeof message.content === "string"
     ? message.content

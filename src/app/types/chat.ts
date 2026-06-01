@@ -38,7 +38,7 @@ export type RichMessage = WithRichContent<SdkMessage>;
  * `ContentBlock.Multimodal.Data`.
  */
 export function isMultimodalBlock(
-  block: RichContentBlock,
+  block: RichContentBlock
 ): block is ContentBlock.Multimodal.Data {
   return block.type !== "text";
 }
@@ -57,9 +57,7 @@ export interface SendInput {
  * content as opaque JSON at runtime. This single named cast is the only
  * place that crosses that gap.
  */
-export function toSdkMessages(
-  messages: readonly RichMessage[],
-): SdkMessage[] {
+export function toSdkMessages(messages: readonly RichMessage[]): SdkMessage[] {
   return messages as unknown as SdkMessage[];
 }
 
@@ -70,7 +68,7 @@ export function toSdkMessages(
  * downstream components can narrow via discriminated union.
  */
 export function fromSdkMessages(
-  messages: readonly SdkMessage[],
+  messages: readonly SdkMessage[]
 ): RichMessage[] {
   return messages as unknown as RichMessage[];
 }

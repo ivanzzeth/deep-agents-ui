@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 // Returns a Promise of a typed multimodal block for images or PDFs
 export async function fileToContentBlock(
-  file: File,
+  file: File
 ): Promise<ContentBlock.Multimodal.Data> {
   const supportedImageTypes = [
     "image/jpeg",
@@ -17,7 +17,9 @@ export async function fileToContentBlock(
 
   if (!supportedFileTypes.includes(file.type)) {
     toast.error(
-      `Unsupported file type: ${file.type}. Supported types are: ${supportedFileTypes.join(", ")}`,
+      `Unsupported file type: ${
+        file.type
+      }. Supported types are: ${supportedFileTypes.join(", ")}`
     );
     return Promise.reject(new Error(`Unsupported file type: ${file.type}`));
   }
@@ -58,7 +60,7 @@ export async function fileToBase64(file: File): Promise<string> {
 
 // Type guard for Base64ContentBlock
 export function isBase64ContentBlock(
-  block: unknown,
+  block: unknown
 ): block is ContentBlock.Multimodal.Data {
   if (typeof block !== "object" || block === null || !("type" in block))
     return false;
