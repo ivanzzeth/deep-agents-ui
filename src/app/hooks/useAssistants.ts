@@ -27,6 +27,12 @@ export function useAssistants() {
         defaultHeaders: apiKey ? { "X-Api-Key": apiKey } : {},
       });
       return await client.assistants.search({ limit: 100 });
+    },
+    {
+      // Auto-refresh: backend's fsnotify watcher can register new agents
+      // at any time. Without polling, the dropdown would silently lag
+      // until the user defocuses + refocuses the tab.
+      refreshInterval: 5000,
     }
   );
 }
