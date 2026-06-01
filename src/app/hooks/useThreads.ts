@@ -166,13 +166,26 @@ export function useThreads(props: {
           }
         }
 
+        // The thread's *own* assistant comes from metadata that langgraph
+        // writes on first run (graph_id = agent name, assistant_id = UUID).
+        // Fall back to the caller's current selection only when missing,
+        // so legacy threads don't render with a blank.
+        const threadAssistantId =
+          (typeof thread.metadata?.graph_id === "string"
+            ? (thread.metadata.graph_id as string)
+            : undefined) ??
+          (typeof thread.metadata?.assistant_id === "string"
+            ? (thread.metadata.assistant_id as string)
+            : undefined) ??
+          assistantId;
+
         return {
           id: thread.thread_id,
           updatedAt: new Date(thread.updated_at),
           status: thread.status,
           title,
           description,
-          assistantId,
+          assistantId: threadAssistantId,
         };
       });
     },

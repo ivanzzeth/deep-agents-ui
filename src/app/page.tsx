@@ -34,6 +34,7 @@ function HomePageInner({
 }: HomePageInnerProps) {
   const client = useClient();
   const [threadId, setThreadId] = useQueryState("threadId");
+  const [, setUrlAssistantId] = useQueryState("assistantId");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sidebar, setSidebar] = useQueryState("sidebar");
 
@@ -181,7 +182,13 @@ function HomePageInner({
                   className="relative min-w-[380px]"
                 >
                   <ThreadList
-                    onThreadSelect={async (id) => {
+                    onThreadSelect={async (id, assistantId) => {
+                      // Switch to the thread *and* the agent it was created
+                      // with. Otherwise the active picker would keep driving
+                      // a different agent on top of someone else's history.
+                      if (assistantId) {
+                        await setUrlAssistantId(assistantId);
+                      }
                       await setThreadId(id);
                     }}
                     onMutateReady={(fn) => setMutateThreads(() => fn)}

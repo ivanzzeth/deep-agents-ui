@@ -134,7 +134,9 @@ function EmptyState() {
 }
 
 interface ThreadListProps {
-  onThreadSelect: (id: string) => void;
+  /** Called with the thread id and (optionally) its associated assistant id,
+   *  so the caller can simultaneously switch threadId + assistantId in the URL. */
+  onThreadSelect: (id: string, assistantId?: string) => void;
   onMutateReady?: (mutate: () => void) => void;
   onClose?: () => void;
   onInterruptCountChange?: (count: number) => void;
@@ -204,7 +206,9 @@ export function ThreadList({
         config.langsmithApiKey
       );
       await threads.mutate();
-      onThreadSelect(newId);
+      // Fork inherits the source thread's assistant — pass it along so the
+      // URL flips both threadId and assistantId in a single navigation.
+      onThreadSelect(newId, thread.assistantId);
     },
     [threads, onThreadSelect]
   );
@@ -405,13 +409,13 @@ export function ThreadList({
                           aria-current={isActive}
                           onClick={() => {
                             if (isEditing) return;
-                            onThreadSelect(thread.id);
+                            onThreadSelect(thread.id, thread.assistantId);
                           }}
                           onKeyDown={(e) => {
                             if (isEditing) return;
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              onThreadSelect(thread.id);
+                              onThreadSelect(thread.id, thread.assistantId);
                             }
                           }}
                           className={cn(
