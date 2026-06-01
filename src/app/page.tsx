@@ -9,6 +9,7 @@ import { Assistant } from "@langchain/langgraph-sdk";
 import { ClientProvider, useClient } from "@/providers/ClientProvider";
 import {
   Activity,
+  Calendar,
   Database,
   History,
   MessagesSquare,
@@ -28,6 +29,7 @@ import { HistoryDialog } from "@/app/components/HistoryDialog";
 import { RunsDialog } from "@/app/components/RunsDialog";
 import { GraphDialog } from "@/app/components/GraphDialog";
 import { StoreDialog } from "@/app/components/StoreDialog";
+import { CronsDialog } from "@/app/components/CronsDialog";
 import { ChatProvider } from "@/providers/ChatProvider";
 import { ChatInterface } from "@/app/components/ChatInterface";
 
@@ -51,6 +53,7 @@ function HomePageInner({
   const [runsOpen, setRunsOpen] = useState(false);
   const [graphOpen, setGraphOpen] = useState(false);
   const [storeOpen, setStoreOpen] = useState(false);
+  const [cronsOpen, setCronsOpen] = useState(false);
   const [sidebar, setSidebar] = useQueryState("sidebar");
 
   const [mutateThreads, setMutateThreads] = useState<(() => void) | null>(null);
@@ -198,6 +201,15 @@ function HomePageInner({
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setCronsOpen(true)}
+              disabled={!assistant}
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              Schedules
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setConfigDialogOpen(true)}
             >
               <Settings className="mr-2 h-4 w-4" />
@@ -277,6 +289,11 @@ function HomePageInner({
               <StoreDialog
                 open={storeOpen}
                 onOpenChange={setStoreOpen}
+              />
+              <CronsDialog
+                open={cronsOpen}
+                onOpenChange={setCronsOpen}
+                assistantId={assistant?.assistant_id ?? null}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
