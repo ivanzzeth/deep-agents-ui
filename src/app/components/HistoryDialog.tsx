@@ -50,7 +50,7 @@ export function HistoryDialog({
       open={open}
       onOpenChange={onOpenChange}
     >
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="flex max-h-[85vh] w-[min(56rem,calc(100vw-2rem))] max-w-[min(56rem,calc(100vw-2rem))] flex-col overflow-hidden sm:max-w-[min(56rem,calc(100vw-2rem))]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-4 w-4" />
@@ -67,8 +67,8 @@ export function HistoryDialog({
             No history yet. Send a message to create checkpoints.
           </p>
         ) : (
-          <ScrollArea className="max-h-[60vh]">
-            <div className="flex flex-col gap-1 pr-2">
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="flex min-w-0 flex-col gap-1 pr-2">
               {history.map((state, idx) => (
                 <CheckpointRow
                   key={(state.checkpoint?.checkpoint_id ?? "root") + idx}
@@ -127,31 +127,31 @@ function CheckpointRow({
     : undefined;
 
   return (
-    <div className="rounded-md border border-border">
+    <div className="min-w-0 rounded-md border border-border">
       <button
         type="button"
         onClick={onToggle}
         className={cn(
-          "flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-accent",
+          "flex w-full min-w-0 items-center justify-between gap-3 px-3 py-2 text-left hover:bg-accent",
           expanded && "bg-accent"
         )}
       >
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5 flex-shrink-0" />
           ) : (
             <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
           )}
-          <span className="text-xs font-semibold">
+          <span className="flex-shrink-0 text-xs font-semibold">
             #{index} {step !== undefined ? `· step ${step}` : ""}
           </span>
           {messageCount !== undefined && (
-            <span className="text-xs text-muted-foreground">
+            <span className="flex-shrink-0 text-xs text-muted-foreground">
               {messageCount} msg{messageCount === 1 ? "" : "s"}
             </span>
           )}
           {checkpointId && (
-            <span className="truncate font-mono text-xs text-muted-foreground">
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
               {checkpointId.slice(0, 8)}…
             </span>
           )}
@@ -161,7 +161,7 @@ function CheckpointRow({
         </span>
       </button>
       {expanded && (
-        <div className="border-t border-border bg-muted/30 px-3 py-2">
+        <div className="min-w-0 border-t border-border bg-muted/30 px-3 py-2">
           <div className="mb-2 flex justify-end">
             <Button
               variant="outline"
@@ -174,7 +174,7 @@ function CheckpointRow({
               Fork from here
             </Button>
           </div>
-          <pre className="max-h-[40vh] overflow-auto rounded bg-background p-2 font-mono text-xs">
+          <pre className="max-h-[40vh] w-full overflow-auto whitespace-pre-wrap break-all rounded bg-background p-2 font-mono text-xs">
             {JSON.stringify(state.values, null, 2)}
           </pre>
         </div>

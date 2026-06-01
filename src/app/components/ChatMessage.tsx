@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useCallback } from "react";
 import type { ContentBlock } from "@langchain/core/messages";
+import { GitBranch } from "lucide-react";
 import { SubAgentIndicator } from "@/app/components/SubAgentIndicator";
 import { ToolCallBox } from "@/app/components/ToolCallBox";
 import { MarkdownContent } from "@/app/components/MarkdownContent";
@@ -33,6 +34,10 @@ interface ChatMessageProps {
   stream?: any;
   onResumeInterrupt?: (value: any) => void;
   graphId?: string;
+  /** Called when the user clicks the "fork from here" button next to this
+   *  message. Undefined → no checkpoint resolves for this message, so the
+   *  control is hidden. */
+  onForkFromHere?: () => void;
 }
 
 function extractMediaBlocks(
@@ -53,6 +58,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     stream,
     onResumeInterrupt,
     graphId,
+    onForkFromHere,
   }) => {
     const isUser = message.type === "human";
     const messageContent = extractStringFromMessageContent(message);
@@ -103,10 +109,25 @@ export const ChatMessage = React.memo<ChatMessageProps>(
       }));
     }, []);
 
+    const forkButton = onForkFromHere ? (
+      <button
+        type="button"
+        onClick={onForkFromHere}
+        className={cn(
+          "inline-flex items-center gap-1 self-center rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground",
+          "opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/msg:opacity-100 focus-visible:opacity-100"
+        )}
+        title="从这里 fork 一个新分支，重新跑后续 turn"
+      >
+        <GitBranch className="h-3 w-3" />
+        <span className="hidden sm:inline">从这里重开</span>
+      </button>
+    ) : null;
+
     return (
       <div
         className={cn(
-          "flex w-full max-w-full overflow-x-hidden",
+          "group/msg flex w-full max-w-full overflow-x-hidden",
           isUser && "flex-row-reverse"
         )}
       >
@@ -137,25 +158,33 @@ export const ChatMessage = React.memo<ChatMessageProps>(
               {hasTextContent && (
                 <div
                   className={cn(
-                    "overflow-hidden break-words text-sm font-normal leading-[150%]",
-                    hasMediaContent ? "mt-0" : "mt-4",
-                    isUser
-                      ? "rounded-xl rounded-br-none border border-border px-3 py-2 text-foreground"
-                      : "text-primary"
+                    "flex items-center gap-2",
+                    isUser ? "flex-row-reverse" : "flex-row"
                   )}
-                  style={
-                    isUser
-                      ? { backgroundColor: "var(--color-user-message-bg)" }
-                      : undefined
-                  }
                 >
-                  {isUser ? (
-                    <p className="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
-                      {messageContent}
-                    </p>
-                  ) : (
-                    <MarkdownContent content={messageContent} />
-                  )}
+                  <div
+                    className={cn(
+                      "overflow-hidden break-words text-sm font-normal leading-[150%]",
+                      hasMediaContent ? "mt-0" : "mt-4",
+                      isUser
+                        ? "rounded-xl rounded-br-none border border-border px-3 py-2 text-foreground"
+                        : "text-primary"
+                    )}
+                    style={
+                      isUser
+                        ? { backgroundColor: "var(--color-user-message-bg)" }
+                        : undefined
+                    }
+                  >
+                    {isUser ? (
+                      <p className="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
+                        {messageContent}
+                      </p>
+                    ) : (
+                      <MarkdownContent content={messageContent} />
+                    )}
+                  </div>
+                  {forkButton}
                 </div>
               )}
             </div>
