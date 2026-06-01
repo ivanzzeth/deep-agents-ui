@@ -208,26 +208,19 @@ function HomePageContent() {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
   const [assistantId, setAssistantId] = useQueryState("assistantId");
 
-  // Resolution precedence: URL `assistantId` query > localStorage > NEXT_PUBLIC_*
-  // env > config dialog. The URL value is treated as a transient override —
-  // it drives the current session but does NOT clobber the saved default in
-  // localStorage. The Settings dialog reflects whatever's currently active.
+  // Resolution precedence: URL `assistantId` query > localStorage > env >
+  // config dialog. The URL value is a transient session override — it drives
+  // the current view but is NOT written back to localStorage. The Settings
+  // dialog reflects whatever's currently active.
+  //
+  // localStorage > env precedence lives inside getConfig() so other hooks
+  // (e.g. useThreads) see the same fallback chain.
   useEffect(() => {
-    const savedConfig = getConfig();
-    const envUrl = process.env.NEXT_PUBLIC_API_URL;
-    const envAssistantId = process.env.NEXT_PUBLIC_ASSISTANT_ID;
-
-    const base: StandaloneConfig | null =
-      savedConfig ??
-      (envUrl && envAssistantId
-        ? { deploymentUrl: envUrl, assistantId: envAssistantId }
-        : null);
-
+    const base = getConfig();
     if (!base) {
       setConfigDialogOpen(true);
       return;
     }
-
     const effective: StandaloneConfig = assistantId
       ? { ...base, assistantId }
       : base;
