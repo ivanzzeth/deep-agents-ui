@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { getConfig } from "@/lib/config";
@@ -95,6 +96,10 @@ export function CronsDialog({
   const [expandedHistoryFor, setExpandedHistoryFor] = useState<string | null>(
     null,
   );
+  // Default to "all crons" so newly-curious users don't have to figure
+  // out the toggle to find anything. Flip to scoped when working on
+  // schedules for a specific agent.
+  const [scopeToCurrent, setScopeToCurrent] = useState(false);
 
   const client = useMemo(() => {
     const config = getConfig();
@@ -107,11 +112,31 @@ export function CronsDialog({
     });
   }, []);
 
-  const crons = useSWR<{ crons: Cron[] }>(
-    open && assistantId && client ? ["crons", assistantId] : null,
+  // Map assistant_id → graph_id so the "Assistant" column shows the
+  // human-readable name (researcher / tweet-writer / …) instead of UUIDs.
+  const assistants = useSWR(
+    open && client ? "cron-assistants" : null,
     async () => {
-      if (!client || !assistantId) return { crons: [] };
-      const list = await client.crons.search({ assistantId, limit: 50 });
+      if (!client) return [];
+      return await client.assistants.search({ limit: 100 });
+    },
+  );
+  const assistantNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const a of assistants.data ?? []) {
+      map[a.assistant_id] = a.graph_id ?? a.name ?? a.assistant_id;
+    }
+    return map;
+  }, [assistants.data]);
+
+  const crons = useSWR<{ crons: Cron[] }>(
+    open && client ? ["crons", scopeToCurrent ? assistantId : "*"] : null,
+    async () => {
+      if (!client) return { crons: [] };
+      const list = await client.crons.search({
+        ...(scopeToCurrent && assistantId ? { assistantId } : {}),
+        limit: 100,
+      });
       return { crons: list as unknown as Cron[] };
     },
   );
@@ -211,12 +236,28 @@ export function CronsDialog({
             Schedules
           </DialogTitle>
           <DialogDescription>
-            Cron-style recurring runs of the current assistant. Each fire
-            opens a fresh thread, sends the prompt as the user message,
-            and runs the agent. Carries tenant id{" "}
-            <code>{tenantId}</code> so scheduled runs see the same
-            long-term memory as interactive ones.
+            Cron-style recurring runs. Each fire opens a fresh thread,
+            sends the prompt as the user message, and runs the chosen
+            agent. Carries tenant id <code>{tenantId}</code> so
+            scheduled runs see the same long-term memory as interactive
+            ones.
           </DialogDescription>
+          <div className="flex items-center gap-2 pt-1">
+            <Switch
+              id="crons-scope"
+              checked={scopeToCurrent}
+              onCheckedChange={setScopeToCurrent}
+              disabled={!assistantId}
+            />
+            <Label
+              htmlFor="crons-scope"
+              className="text-xs text-muted-foreground"
+            >
+              {scopeToCurrent && assistantId
+                ? `Showing schedules for ${assistantNameById[assistantId] ?? "this agent"}`
+                : "Showing schedules for ALL agents"}
+            </Label>
+          </div>
         </DialogHeader>
 
         <div className="flex min-h-0 flex-col gap-4 overflow-hidden">
@@ -232,7 +273,9 @@ export function CronsDialog({
 
           <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
             <p className="text-xs font-medium text-muted-foreground">
-              Active schedules for this assistant
+              {scopeToCurrent
+                ? "Active schedules for this assistant"
+                : "All active schedules in the workspace"}
             </p>
             <ScrollArea className="min-h-0 flex-1 rounded-md border border-border">
               <div className="flex flex-col gap-1 p-2">
@@ -257,6 +300,8 @@ export function CronsDialog({
                   <CronRow
                     key={c.cron_id}
                     cron={c}
+                    assistantName={assistantNameById[c.assistant_id]}
+                    showAssistantName={!scopeToCurrent}
                     isEditing={form.editingCronId === c.cron_id}
                     isHistoryOpen={expandedHistoryFor === c.cron_id}
                     onToggleHistory={() =>
@@ -400,6 +445,8 @@ function CronForm({
 
 function CronRow({
   cron,
+  assistantName,
+  showAssistantName,
   isEditing,
   isHistoryOpen,
   onToggleHistory,
@@ -409,6 +456,8 @@ function CronRow({
   onCloseDialog,
 }: {
   cron: Cron;
+  assistantName: string | undefined;
+  showAssistantName: boolean;
   isEditing: boolean;
   isHistoryOpen: boolean;
   onToggleHistory: () => void;
@@ -443,8 +492,15 @@ function CronRow({
           )}
         </button>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate font-mono">
-            {cron.schedule} · {tz}
+          <span className="flex min-w-0 items-baseline gap-2 truncate font-mono">
+            {showAssistantName && (
+              <span className="flex-shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {assistantName ?? "?"}
+              </span>
+            )}
+            <span className="truncate">
+              {cron.schedule} · {tz}
+            </span>
           </span>
           <span className="truncate text-muted-foreground">
             {next ? `next ${new Date(next).toLocaleString()}` : "scheduled"}
