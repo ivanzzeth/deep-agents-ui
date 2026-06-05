@@ -18,12 +18,19 @@ export function getStoredConfig(): StandaloneConfig | null {
   }
 }
 
-/** Build a config from NEXT_PUBLIC_* env vars if both are set. */
+/**
+ * Build a config from NEXT_PUBLIC_* env vars.
+ *
+ * Only NEXT_PUBLIC_API_URL (deployment URL) is required. When
+ * NEXT_PUBLIC_ASSISTANT_ID is omitted, an empty assistantId is returned and
+ * the page-level fetcher will auto-discover the first available assistant
+ * from the deployment.
+ */
 export function getEnvConfig(): StandaloneConfig | null {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   const envAssistantId = process.env.NEXT_PUBLIC_ASSISTANT_ID;
-  if (envUrl && envAssistantId) {
-    return { deploymentUrl: envUrl, assistantId: envAssistantId };
+  if (envUrl) {
+    return { deploymentUrl: envUrl, assistantId: envAssistantId ?? "" };
   }
   return null;
 }

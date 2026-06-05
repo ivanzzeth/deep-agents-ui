@@ -62,6 +62,7 @@ function HomePageInner({
 
   const fetchAssistant = useCallback(async () => {
     const isUUID =
+      !!config.assistantId &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         config.assistantId
       );
@@ -87,38 +88,54 @@ function HomePageInner({
       }
     } else {
       try {
-        // We should try to list out the assistants for this graph, and then use the default one.
+        // Try to list assistants for this graph (or all assistants if no
+        // graphId was configured) and pick the system-default one. If no
+        // explicit default is registered, fall back to the first assistant
+        // returned by the server so the UI can boot with only a deployment
+        // URL configured.
         // TODO: Paginate this search, but 100 should be enough for graph name
-        const assistants = await client.assistants.search({
-          graphId: config.assistantId,
+        const searchParams: { graphId?: string; limit: number } = {
           limit: 100,
-        });
-        const defaultAssistant = assistants.find(
-          (assistant) => assistant.metadata?.["created_by"] === "system"
-        );
-        if (defaultAssistant === undefined) {
-          throw new Error("No default assistant found");
+        };
+        if (config.assistantId) {
+          searchParams.graphId = config.assistantId;
+        }
+        const assistants = await client.assistants.search(searchParams);
+        const defaultAssistant =
+          assistants.find(
+            (assistant) => assistant.metadata?.["created_by"] === "system"
+          ) ?? assistants[0];
+        if (!defaultAssistant) {
+          throw new Error("No assistants available on this deployment");
         }
         setAssistant(defaultAssistant);
+        // When the user didn't configure an assistantId, propagate the
+        // auto-discovered one back to the URL so other hooks (useThreads,
+        // AgentPicker, …) see a stable id.
+        if (!config.assistantId) {
+          void setUrlAssistantId(defaultAssistant.assistant_id);
+        }
       } catch (error) {
         console.error(
           "Failed to find default assistant from graph_id: try setting the assistant_id directly:",
           error
         );
-        setAssistant({
-          assistant_id: config.assistantId,
-          graph_id: config.assistantId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          config: {},
-          metadata: {},
-          version: 1,
-          name: config.assistantId,
-          context: {},
-        });
+        if (config.assistantId) {
+          setAssistant({
+            assistant_id: config.assistantId,
+            graph_id: config.assistantId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            config: {},
+            metadata: {},
+            version: 1,
+            name: config.assistantId,
+            context: {},
+          });
+        }
       }
     }
-  }, [client, config.assistantId]);
+  }, [client, config.assistantId, setUrlAssistantId]);
 
   useEffect(() => {
     fetchAssistant();
@@ -325,7 +342,10 @@ function HomePageContent() {
       ? { ...base, assistantId }
       : base;
     setConfig(effective);
-    if (!assistantId) {
+    // Only sync assistantId into the URL when we actually have one. With
+    // auto-discovery, the initial config may have an empty assistantId until
+    // the page-level fetcher resolves the deployment's default.
+    if (!assistantId && effective.assistantId) {
       setAssistantId(effective.assistantId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -333,7 +353,7 @@ function HomePageContent() {
 
   // If config changes, update the assistantId
   useEffect(() => {
-    if (config && !assistantId) {
+    if (config && !assistantId && config.assistantId) {
       setAssistantId(config.assistantId);
     }
   }, [config, assistantId, setAssistantId]);
