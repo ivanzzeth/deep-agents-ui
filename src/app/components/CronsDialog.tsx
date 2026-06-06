@@ -642,7 +642,7 @@ async function createCron(
       schedule,
       timezone,
       input: { messages: [{ type: "human", content: prompt }] },
-      config: { configurable: { tenant_id: tenantId } },
+      config: { configurable: { tenant_id: tenantId, workspace_id: tenantId } },
       // langgraph's default is `delete` — after each fire the
       // auto-created thread is purged, which kills the "triggered
       // threads" history below. Keep them around so users can see

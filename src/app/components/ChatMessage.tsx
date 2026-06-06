@@ -6,7 +6,7 @@ import { GitBranch } from "lucide-react";
 import { SubAgentIndicator } from "@/app/components/SubAgentIndicator";
 import { ToolCallBox } from "@/app/components/ToolCallBox";
 import { MarkdownContent } from "@/app/components/MarkdownContent";
-import { MultimodalPreview } from "@/app/components/MultimodalPreview";
+import { MessageMultimodalDisplay } from "@/app/components/MessageMultimodalDisplay";
 import type {
   SubAgent,
   ToolCall,
@@ -147,7 +147,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
               {hasMediaContent && (
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
                   {mediaBlocks.map((block, idx) => (
-                    <MultimodalPreview
+                    <MessageMultimodalDisplay
                       key={idx}
                       block={block}
                       size="md"

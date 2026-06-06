@@ -57,12 +57,13 @@ export function useChat({
   // Tag freshly-created threads with the current tenant. Without this,
   // ThreadList can't filter by tenant — langgraph dev auto-creates the
   // thread on first submit and only the server-side run config sees the
-  // tenant id.
+  // tenant id. `workspace_id` mirrors `tenant_id` so backend @tool helpers
+  // that read either key (Task #17) resolve to the same isolated namespace.
   const tagThreadWithTenant = useCallback(
     async (newThreadId: string) => {
       try {
         await client.threads.update(newThreadId, {
-          metadata: { tenant_id: tenantId },
+          metadata: { tenant_id: tenantId, workspace_id: tenantId },
         });
       } catch (err) {
         console.warn(
@@ -136,6 +137,12 @@ export function useChat({
   // backend MemoryRecallMiddleware + memory_save/recall tools can scope
   // long-term memory to ("tenant", tenantId, "memory"). Recursion limit
   // is folded in here too so callers never forget it.
+  //
+  // `workspace_id` is published alongside `tenant_id` so backend @tool
+  // implementations that read the workspace key (Task #17 — tenant
+  // file system / sandbox tools) resolve to the same isolated namespace
+  // without relying on a separate handshake. Both default to "default"
+  // via useTenant() when the user hasn't picked a tenant yet.
   const buildConfig = useCallback(
     (extra?: Record<string, unknown>) => {
       const base = activeAssistant?.config ?? {};
@@ -148,6 +155,7 @@ export function useChat({
         configurable: {
           ...baseConfigurable,
           tenant_id: tenantId,
+          workspace_id: tenantId,
           ...((extra as { configurable?: Record<string, unknown> })?.configurable ?? {}),
         },
       };
