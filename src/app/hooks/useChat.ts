@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import {
   type Message,
@@ -269,14 +269,75 @@ export function useChat({
     stream.stop();
   }, [stream]);
 
+  // Fallback: when LangGraph uses incremental checkpoints, the
+  // /threads/{id}/state and /history endpoints can return
+  // `messages: null` if the latest step didn't touch the messages
+  // channel. The SDK surfaces null as an empty array, so the chat
+  // pane renders blank even though the thread has a full transcript.
+  // GET /threads/{threadId} (Oscar's fix) always returns the
+  // materialized state, so fall back to it whenever stream.messages
+  // is empty for an existing thread that has finished loading.
+  const [fallbackState, setFallbackState] = useState<StateType | null>(null);
+
+  useEffect(() => {
+    // Reset fallback whenever the active thread changes so we don't
+    // leak the previous thread's transcript into a new conversation.
+    setFallbackState(null);
+  }, [threadId]);
+
+  useEffect(() => {
+    if (!threadId) return;
+    if (stream.isThreadLoading) return;
+    if (stream.isLoading) return;
+    if ((stream.messages?.length ?? 0) > 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const thread = await client.threads.get<StateType>(threadId);
+        if (cancelled) return;
+        const values = thread?.values;
+        if (values && Array.isArray(values.messages) && values.messages.length > 0) {
+          setFallbackState(values);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        // 404 is handled elsewhere (clears the URL); only log other errors.
+        if (!(isHttpStatusError(err) && err.status === 404)) {
+          console.warn(
+            "[useChat] failed to fetch materialized thread state for fallback",
+            threadId,
+            err,
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [client, threadId, stream.isThreadLoading, stream.isLoading, stream.messages]);
+
+  const streamMessages = stream.messages ?? [];
+  const effectiveMessages =
+    streamMessages.length > 0
+      ? streamMessages
+      : fallbackState?.messages ?? streamMessages;
+  const effectiveTodos =
+    stream.values.todos ?? fallbackState?.todos ?? [];
+  const effectiveFiles =
+    stream.values.files ?? fallbackState?.files ?? {};
+  const effectiveEmail = stream.values.email ?? fallbackState?.email;
+  const effectiveUi = stream.values.ui ?? fallbackState?.ui;
+
   return {
     stream,
-    todos: stream.values.todos ?? [],
-    files: stream.values.files ?? {},
-    email: stream.values.email,
-    ui: stream.values.ui,
+    todos: effectiveTodos,
+    files: effectiveFiles,
+    email: effectiveEmail,
+    ui: effectiveUi,
     setFiles,
-    messages: fromSdkMessages(stream.messages),
+    messages: fromSdkMessages(effectiveMessages),
     isLoading: stream.isLoading,
     isThreadLoading: stream.isThreadLoading,
     interrupt: stream.interrupt,
