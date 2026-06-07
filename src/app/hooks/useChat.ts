@@ -289,7 +289,9 @@ export function useChat({
     if (!threadId) return;
     if (stream.isThreadLoading) return;
     if (stream.isLoading) return;
-    if ((stream.messages?.length ?? 0) > 0) return;
+    // Always try to fetch the complete state from GET /threads/{id}
+    // because stream.messages may be incomplete (incremental checkpoints).
+    // This ensures we get the full conversation history.
 
     let cancelled = false;
     (async () => {
@@ -316,13 +318,19 @@ export function useChat({
     return () => {
       cancelled = true;
     };
-  }, [client, threadId, stream.isThreadLoading, stream.isLoading, stream.messages]);
+  }, [client, threadId, stream.isThreadLoading, stream.isLoading]);
 
+  // Priority order for messages:
+  // 1. fallbackState.messages (from GET /threads/{id}) — always complete
+  // 2. stream.messages — may be incomplete (only latest checkpoint)
+  //
+  // LangGraph's incremental checkpoints mean /threads/{id}/state and
+  // /history can return partial messages if the latest step didn't touch
+  // the messages channel. GET /threads/{id} always returns materialized
+  // state, so prefer it when available.
   const streamMessages = stream.messages ?? [];
   const effectiveMessages =
-    streamMessages.length > 0
-      ? streamMessages
-      : fallbackState?.messages ?? streamMessages;
+    fallbackState?.messages ?? streamMessages;
   const effectiveTodos =
     stream.values.todos ?? fallbackState?.todos ?? [];
   const effectiveFiles =
