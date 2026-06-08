@@ -25,6 +25,7 @@ import {
 import { ThreadList } from "@/app/components/ThreadList";
 import { AgentPicker } from "@/app/components/AgentPicker";
 import { TenantPicker } from "@/app/components/TenantPicker";
+import { FilesystemBackendToggle } from "@/app/components/FilesystemBackendToggle";
 import { HistoryDialog } from "@/app/components/HistoryDialog";
 import { RunsDialog } from "@/app/components/RunsDialog";
 import { GraphDialog } from "@/app/components/GraphDialog";
@@ -176,6 +177,14 @@ function HomePageInner({
                 // Threads are bound to the tenant they were created with;
                 // dropping the current threadId starts the new tenant
                 // fresh instead of trying to load a thread it can't see.
+                void setThreadId(null);
+              }}
+            />
+            <FilesystemBackendToggle
+              onSwitch={() => {
+                // New threads pick up the new backend; existing threads
+                // keep their original backend. Clear threadId so the user
+                // starts a fresh conversation with the new backend.
                 void setThreadId(null);
               }}
             />

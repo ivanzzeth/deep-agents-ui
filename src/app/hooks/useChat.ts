@@ -20,6 +20,7 @@ import {
 import { useClient } from "@/providers/ClientProvider";
 import { useQueryState } from "nuqs";
 import { useTenant } from "@/app/hooks/useTenant";
+import { useFilesystemBackend } from "@/app/hooks/useFilesystemBackend";
 
 export type StateType = {
   messages: Message[];
@@ -53,6 +54,7 @@ export function useChat({
   const [threadId, setThreadId] = useQueryState("threadId");
   const client = useClient();
   const { tenantId } = useTenant();
+  const { backend: fsBackend } = useFilesystemBackend();
 
   // Tag freshly-created threads with the current tenant. Without this,
   // ThreadList can't filter by tenant — langgraph dev auto-creates the
@@ -63,7 +65,11 @@ export function useChat({
     async (newThreadId: string) => {
       try {
         await client.threads.update(newThreadId, {
-          metadata: { tenant_id: tenantId, workspace_id: tenantId },
+          metadata: {
+            tenant_id: tenantId,
+            workspace_id: tenantId,
+            filesystem_backend: fsBackend,
+          },
         });
       } catch (err) {
         console.warn(
@@ -74,7 +80,7 @@ export function useChat({
         );
       }
     },
-    [client, tenantId]
+    [client, tenantId, fsBackend]
   );
 
   // A thread that langgraph dev no longer knows about (server restarted,
@@ -156,11 +162,12 @@ export function useChat({
           ...baseConfigurable,
           tenant_id: tenantId,
           workspace_id: tenantId,
+          filesystem_backend: fsBackend,
           ...((extra as { configurable?: Record<string, unknown> })?.configurable ?? {}),
         },
       };
     },
-    [activeAssistant?.config, tenantId]
+    [activeAssistant?.config, tenantId, fsBackend]
   );
 
   const sendMessage = useCallback(
