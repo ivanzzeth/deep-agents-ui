@@ -16,6 +16,7 @@ import {
   Clock,
   Circle,
   FileIcon,
+  HardDrive,
   Paperclip,
 } from "lucide-react";
 import { ChatMessage } from "@/app/components/ChatMessage";
@@ -34,6 +35,9 @@ import { useChatContext } from "@/providers/ChatProvider";
 import { cn } from "@/lib/utils";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { FilesPopover } from "@/app/components/TasksFilesSidebar";
+import { StoreFilesPanel } from "@/app/components/StoreFilesPanel";
+import { useFilesystemBackend } from "@/app/hooks/useFilesystemBackend";
+import { useStoreFiles } from "@/app/hooks/useStoreFiles";
 
 interface ChatInterfaceProps {
   assistant: Assistant | null;
@@ -66,7 +70,7 @@ const getStatusIcon = (status: TodoItem["status"], className?: string) => {
 };
 
 export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
-  const [metaOpen, setMetaOpen] = useState<"tasks" | "files" | null>(null);
+  const [metaOpen, setMetaOpen] = useState<"tasks" | "files" | "store" | null>(null);
   const tasksContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -98,6 +102,9 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     resumeInterrupt,
     getMessagesMetadata,
   } = useChatContext();
+
+  const { backend: fsBackend } = useFilesystemBackend();
+  const storeFiles = useStoreFiles();
 
   // Fork-from-here. Walks the SDK's per-message metadata to find the
   // ThreadState the message first appeared in; submitting against that
@@ -266,6 +273,8 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
 
   const hasTasks = todos.length > 0;
   const hasFiles = Object.keys(files).length > 0;
+  const hasStoreFiles = storeFiles.files.length > 0;
+  const isStoreMode = fsBackend === "store";
 
   // Parse out any action requests or review configs from the interrupt
   const actionRequestsMap: Map<string, ActionRequest> | null = useMemo(() => {
@@ -342,7 +351,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
             "mx-auto w-[calc(100%-32px)] max-w-[1024px] transition-colors duration-200 ease-in-out"
           )}
         >
-          {(hasTasks || hasFiles) && (
+          {(hasTasks || hasFiles || hasStoreFiles) && (
             <div className="flex max-h-72 flex-col overflow-y-auto border-b border-border bg-sidebar empty:hidden">
               {!metaOpen && (
                 <>
@@ -449,10 +458,33 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                       );
                     })();
 
+                    const storeTrigger = (() => {
+                      if (!hasStoreFiles) return null;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMetaOpen((prev) =>
+                              prev === "store" ? null : "store"
+                            )
+                          }
+                          className="flex flex-shrink-0 cursor-pointer items-center gap-2 px-[18px] py-3 text-left text-sm"
+                          aria-expanded={metaOpen === "store"}
+                        >
+                          <HardDrive size={16} className="text-amber-500" />
+                          Files (Store)
+                          <span className="h-4 min-w-4 rounded-full bg-amber-600 px-0.5 text-center text-[10px] leading-[16px] text-white">
+                            {storeFiles.files.length}
+                          </span>
+                        </button>
+                      );
+                    })();
+
                     return (
-                      <div className="grid grid-cols-[1fr_auto_auto] items-center">
+                      <div className="grid grid-cols-[1fr_auto_auto_auto] items-center">
                         {tasksTrigger}
                         {filesTrigger}
+                        {storeTrigger}
                       </div>
                     );
                   })()}
@@ -490,6 +522,24 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                         Files (State)
                         <span className="h-4 min-w-4 rounded-full bg-[#2F6868] px-0.5 text-center text-[10px] leading-[16px] text-white">
                           {Object.keys(files).length}
+                        </span>
+                      </button>
+                    )}
+                    {hasStoreFiles && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 py-3 pr-4 first:pl-[18px] aria-expanded:font-semibold"
+                        onClick={() =>
+                          setMetaOpen((prev) =>
+                            prev === "store" ? null : "store"
+                          )
+                        }
+                        aria-expanded={metaOpen === "store"}
+                      >
+                        <HardDrive size={14} className="text-amber-500" />
+                        Files (Store)
+                        <span className="h-4 min-w-4 rounded-full bg-amber-600 px-0.5 text-center text-[10px] leading-[16px] text-white">
+                          {storeFiles.files.length}
                         </span>
                       </button>
                     )}
@@ -538,6 +588,20 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                         <FilesPopover
                           files={files}
                           setFiles={setFiles}
+                          editDisabled={
+                            isLoading === true || interrupt !== undefined
+                          }
+                        />
+                      </div>
+                    )}
+
+                    {metaOpen === "store" && (
+                      <div className="mb-6">
+                        <StoreFilesPanel
+                          files={storeFiles.files}
+                          isLoading={storeFiles.isLoading}
+                          error={storeFiles.error}
+                          onRefresh={storeFiles.mutate}
                           editDisabled={
                             isLoading === true || interrupt !== undefined
                           }
