@@ -336,8 +336,13 @@ export function useChat({
   // the messages channel. GET /threads/{id} always returns materialized
   // state, so prefer it when available.
   const streamMessages = stream.messages ?? [];
+  // Prefer the live, branch-aware stream.messages whenever it has content;
+  // only fall back to the materialized HEAD (GET /threads/{id}) when the
+  // stream is genuinely empty (incremental checkpoints can return no
+  // messages). The old order (fallback first) could paint a stale HEAD over
+  // the live stream during/after a run.
   const effectiveMessages =
-    fallbackState?.messages ?? streamMessages;
+    streamMessages.length > 0 ? streamMessages : (fallbackState?.messages ?? []);
   const effectiveTodos =
     stream.values.todos ?? fallbackState?.todos ?? [];
   const effectiveFiles =

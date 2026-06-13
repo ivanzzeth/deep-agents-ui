@@ -100,29 +100,10 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     sendMessage,
     stopStream,
     resumeInterrupt,
-    getMessagesMetadata,
   } = useChatContext();
 
   const { backend: fsBackend } = useFilesystemBackend();
   const storeFiles = useStoreFiles();
-
-  // Fork-from-here. Walks the SDK's per-message metadata to find the
-  // ThreadState the message first appeared in; submitting against that
-  // checkpoint starts a new branch from before the *following* node
-  // runs. Returns undefined when no checkpoint is available (e.g. an
-  // optimistic in-flight message) so the button doesn't render.
-  const makeForkHandler = useCallback(
-    (message: RichMessage): (() => void) | undefined => {
-      if (!stream || !getMessagesMetadata) return undefined;
-      const meta = getMessagesMetadata(message as unknown as Parameters<typeof getMessagesMetadata>[0]);
-      const checkpoint = meta?.firstSeenState?.checkpoint;
-      if (!checkpoint) return undefined;
-      return () => {
-        void stream.submit(undefined, { checkpoint });
-      };
-    },
-    [stream, getMessagesMetadata]
-  );
 
   const submitDisabled = isLoading || !assistant;
 
@@ -330,12 +311,6 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
                     stream={stream}
                     onResumeInterrupt={resumeInterrupt}
                     graphId={assistant?.graph_id}
-                    onForkFromHere={
-                      // Hide while streaming — forking mid-flight is racy.
-                      isLoading && isLastMessage
-                        ? undefined
-                        : makeForkHandler(data.message)
-                    }
                   />
                 );
               })}

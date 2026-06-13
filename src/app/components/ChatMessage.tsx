@@ -2,7 +2,6 @@
 
 import React, { useMemo, useState, useCallback } from "react";
 import type { ContentBlock } from "@langchain/core/messages";
-import { GitBranch } from "lucide-react";
 import { SubAgentIndicator } from "@/app/components/SubAgentIndicator";
 import { ToolCallBox } from "@/app/components/ToolCallBox";
 import { MarkdownContent } from "@/app/components/MarkdownContent";
@@ -34,10 +33,6 @@ interface ChatMessageProps {
   stream?: any;
   onResumeInterrupt?: (value: any) => void;
   graphId?: string;
-  /** Called when the user clicks the "fork from here" button next to this
-   *  message. Undefined → no checkpoint resolves for this message, so the
-   *  control is hidden. */
-  onForkFromHere?: () => void;
 }
 
 function extractMediaBlocks(
@@ -58,7 +53,6 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     stream,
     onResumeInterrupt,
     graphId,
-    onForkFromHere,
   }) => {
     const isUser = message.type === "human";
     const messageContent = extractStringFromMessageContent(message);
@@ -108,21 +102,6 @@ export const ChatMessage = React.memo<ChatMessageProps>(
         [id]: prev[id] === undefined ? false : !prev[id],
       }));
     }, []);
-
-    const forkButton = onForkFromHere ? (
-      <button
-        type="button"
-        onClick={onForkFromHere}
-        className={cn(
-          "inline-flex items-center gap-1 self-center rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground",
-          "opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover/msg:opacity-100 focus-visible:opacity-100"
-        )}
-        title="Fork a new branch from this point and re-run the rest"
-      >
-        <GitBranch className="h-3 w-3" />
-        <span className="hidden sm:inline">Fork from here</span>
-      </button>
-    ) : null;
 
     return (
       <div
@@ -184,7 +163,6 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                       <MarkdownContent content={messageContent} />
                     )}
                   </div>
-                  {forkButton}
                 </div>
               )}
             </div>
